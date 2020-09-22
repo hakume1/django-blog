@@ -28,6 +28,8 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -37,8 +39,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'password_reset',    # 新增
     # 新增'article'代码，激活app
     'article',
+    'userprofile',
 ]
 
 MIDDLEWARE = [
@@ -128,4 +132,21 @@ STATICFILES_DIRS = (
 )
 
 STATIC_URL = '/static/'
+
+# SMTP服务器，改为你的邮箱的smtp!
+EMAIL_HOST = 'smtp.qq.com'
+# 改为你自己的邮箱名！
+EMAIL_HOST_USER = '641128351@qq.com'
+# 你的邮箱密码
+EMAIL_HOST_PASSWORD = 'gtffnrcfxrcibdda'
+# 发送邮件的端口
+EMAIL_PORT = 587
+# 是否使用 TLS
+EMAIL_USE_TLS = True
+# 默认的发件人
+DEFAULT_FROM_EMAIL = '郭泽鑫的博客 <641128351@qq.com>'
+
+# 媒体文件地址
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 
