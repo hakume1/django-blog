@@ -27,6 +27,7 @@ from django.db.models import Q
 # 视图函数
 #@csrf_exempt
 def article_list(request):
+    '''
     # 取出所有博客文章
     # 分页处理 修改变量名称（articles -> article_list）
     #article_list = ArticlePost.objects.all()
@@ -39,6 +40,31 @@ def article_list(request):
     else:
         article_list = ArticlePost.objects.all()
         order = 'normal'
+    '''
+
+    search = request.GET.get('search')
+    order = request.GET.get('order')
+    # 用户搜索逻辑
+    if search:
+        if order == 'total_views':
+            # 用 Q对象 进行联合搜索
+            article_list = ArticlePost.objects.filter(
+                Q(title__icontains=search) |
+                Q(body__icontains=search)
+            ).order_by('-total_views')
+        else:
+            article_list = ArticlePost.objects.filter(
+                Q(title__icontains=search) |
+                Q(body__icontains=search)
+            )
+    else:
+        # 将 search 参数重置为空
+        search = ''
+        if order == 'total_views':
+            article_list = ArticlePost.objects.all().order_by('-total_views')
+        else:
+            article_list = ArticlePost.objects.all()
+
     # 每页显示 6 篇文章
     paginator = Paginator(article_list, 6)
     # 获取 url 中的页码
@@ -64,16 +90,18 @@ def article_detail(request, id):
     article.save(update_fields=['total_views'])
 
     # 将markdown语法渲染成html样式
-    article.body = markdown.markdown(article.body,
+    md = markdown.Markdown(
     extensions=[
     # 包含 缩写、表格等常用扩展
     'markdown.extensions.extra',
     # 语法高亮扩展
     'markdown.extensions.codehilite',
+    # 目录扩展
+    'markdown.extensions.toc',
     ])
-    
+    article.body = md.convert(article.body)
     # 需要传递给模板的对象
-    context = { 'article': article }
+    context = { 'article': article, 'toc': md.toc }
     # 载入模板，并返回context对象
     return render(request, 'article/detail.html', context)
 
