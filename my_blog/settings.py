@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'password_reset',    # 新增
+    'taggit',
     # 新增'article'代码，激活app
     'article',
     'userprofile',

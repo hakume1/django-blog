@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 # Create your views here.
 
 # 导入数据模型ArticlePost
-from .models import ArticlePost
+from .models import ArticlePost,ArticleColumn
 # 引入markdown模块
 import markdown
 # 引入redirect重定向模块
@@ -25,6 +25,10 @@ from django.db.models import Q
 
 from comment.models import Comment
 
+from django.views.generic import ListView,DetailView
+
+from django.views.generic.edit import CreateView
+
 # 引入markdown模块
 #import markdown
 
@@ -40,7 +44,18 @@ def article_list(request):
 
     # 根据GET请求中查询条件
     # 返回不同排序的对象数组
+    #search = request.GET.get('search')
+
+    # 从 url 中提取查询参数
     search = request.GET.get('search')
+    order = request.GET.get('order')
+    column = request.GET.get('column')
+    tag = request.GET.get('tag')
+
+    # 初始化查询集
+    article_list = ArticlePost.objects.all()
+
+
     # 搜索查询集
     if search:
         article_list = article_list.filter(
@@ -51,20 +66,33 @@ def article_list(request):
         # 将 search 参数重置为空
         search = ''
 
-    if request.GET.get('order') == 'total_views':
-        article_list = ArticlePost.objects.all().order_by('-total_views')
-        order = 'total_views'
-    else:
-        article_list = ArticlePost.objects.all()
-        order = 'normal'
+    # 栏目查询集
+    if column is not None and column.isdigit():
+        article_list = article_list.filter(column=column)
+
+    # 标签查询集
+    if tag and tag != 'None':
+        article_list = article_list.filter(tags__name__in=[tag])
+
+    # 查询集排序
+    if order == 'total_views':
+        # 按热度排序博文
+        article_list = article_list.order_by('-total_views')
+
     # 每页显示 6 篇文章
-    paginator = Paginator(article_list, 6)
+    paginator = Paginator(article_list, 3)
     # 获取 url 中的页码
     page = request.GET.get('page')
     # 将导航对象相应的页码内容返回给 articles
     articles = paginator.get_page(page)
     # 需要传递给模板（templates）的对象
-    context = { 'articles': articles,'order': order,'search': search }
+    context = {
+        'articles': articles,
+        'order': order,
+        'search': search,
+        'column': column,
+        'tag': tag,
+    }
     # render函数：载入模板，并返回context对象
     return render(request, 'article/list.html', context)
 
@@ -122,7 +150,7 @@ def article_create(request):
     # 判断用户是否提交数据
     if request.method == "POST":
         # 将提交的数据赋值到表单实例中
-        article_post_form = ArticlePostForm(data=request.POST)
+        article_post_form = ArticlePostForm(request.POST, request.FILES)
         # 判断提交的数据是否满足模型的要求
         if article_post_form.is_valid():
             # 保存数据，但暂时不提交到数据库中
@@ -131,8 +159,17 @@ def article_create(request):
             # 如果你进行过删除数据表的操作，可能会找不到id=1的用户
             # 此时请重新创建用户，并传入此用户的id
             new_article.author = User.objects.get(id=request.user.id)
+
+            if request.POST['column'] != 'none':
+                # 保存文章栏目
+                new_article.column = ArticleColumn.objects.get(id=request.POST['column'])
+
             # 将新文章保存到数据库中
             new_article.save()
+
+            # 新增代码，保存 tags 的多对多关系
+            article_post_form.save_m2m()
+
             # 完成后返回到文章列表
             return redirect("article:article_list")
         # 如果数据不合法，返回错误信息
@@ -142,8 +179,10 @@ def article_create(request):
     else:
         # 创建表单类实例
         article_post_form = ArticlePostForm()
+        # 文章栏目
+        columns = ArticleColumn.objects.all()
         # 赋值上下文
-        context = { 'article_post_form': article_post_form }
+        context = { 'article_post_form': article_post_form, 'columns': columns }
         # 返回模板
         return render(request, 'article/create.html', context)
 
@@ -196,6 +235,18 @@ def article_update(request, id):
             # 保存新写入的 title、body 数据并保存
             article.title = request.POST['title']
             article.body = request.POST['body']
+
+            if request.POST['column'] != 'none':
+                # 保存文章栏目
+                article.column = ArticleColumn.objects.get(id=request.POST['column'])
+            else:
+                article.column = None
+
+            if request.FILES.get('avatar'):
+                article.avatar = request.FILES.get('avatar')
+
+
+            article.tags.set(*request.POST.get('tags').split(','), clear=True)
             article.save()
             # 完成后返回到修改后的文章中。需传入文章的 id 值
             return redirect("article:article_detail", id=id)
@@ -207,7 +258,61 @@ def article_update(request, id):
     else:
         # 创建表单类实例
         article_post_form = ArticlePostForm()
+
+        # 文章栏目
+        columns = ArticleColumn.objects.all()
+
         # 赋值上下文，将 article 文章对象也传递进去，以便提取旧的内容
-        context = { 'article': article, 'article_post_form': article_post_form }
+        context = {
+            'article': article,
+            'article_post_form': article_post_form,
+            'columns': columns,
+            'tags': ','.join([x for x in article.tags.names()]),
+        }
         # 将响应返回到模板中
         return render(request, 'article/update.html', context)
+
+
+class ContextMixin:
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['order'] = 'total_views'
+        return context
+
+class ArticleListView(ContextMixin, ListView):
+    context_object_name = 'articles'
+    template_name = 'article/list.html'
+
+    def get_queryset(self):
+        """
+        查询集
+        """
+        queryset = ArticlePost.objects.filter(title='Python')
+        return queryset
+    
+    
+class ArticleDetailView(DetailView):
+    queryset = ArticlePost.objects.all()
+    context_object_name = 'article'
+    template_name = 'article/detail.html'
+
+    def get_object(self):
+        """
+        获取需要展示的对象
+        """
+        # 首先调用父类的方法
+        obj = super(ArticleDetailView, self).get_object()
+        # 浏览量 +1
+        obj.total_views += 1
+        obj.save(update_fields=['total_views'])
+        return obj
+
+
+class ArticleCreateView(CreateView):
+    model = ArticlePost
+
+    fields = '__all__'
+    # 或者只填写部分字段，比如：
+    # fields = ['title', 'content']
+
+    template_name = 'article/create_by_class_view.html'
