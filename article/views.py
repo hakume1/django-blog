@@ -1,10 +1,11 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
 
 # Create your views here.
 
 # 导入数据模型ArticlePost
 from .models import ArticlePost
-
+# 引入markdown模块
+import markdown
 # 引入redirect重定向模块
 from django.shortcuts import render, redirect
 # 引入HttpResponse
@@ -22,49 +23,40 @@ from django.core.paginator import Paginator
 # 引入 Q 对象
 from django.db.models import Q
 
+from comment.models import Comment
+
+# 引入markdown模块
+#import markdown
+
+
 #from django.views.decorators.csrf import csrf_exempt
 
 # 视图函数
 #@csrf_exempt
 def article_list(request):
-    '''
     # 取出所有博客文章
     # 分页处理 修改变量名称（articles -> article_list）
     #article_list = ArticlePost.objects.all()
 
     # 根据GET请求中查询条件
     # 返回不同排序的对象数组
+    search = request.GET.get('search')
+    # 搜索查询集
+    if search:
+        article_list = article_list.filter(
+            Q(title__icontains=search) |
+            Q(body__icontains=search)
+        )
+    else:
+        # 将 search 参数重置为空
+        search = ''
+
     if request.GET.get('order') == 'total_views':
         article_list = ArticlePost.objects.all().order_by('-total_views')
         order = 'total_views'
     else:
         article_list = ArticlePost.objects.all()
         order = 'normal'
-    '''
-
-    search = request.GET.get('search')
-    order = request.GET.get('order')
-    # 用户搜索逻辑
-    if search:
-        if order == 'total_views':
-            # 用 Q对象 进行联合搜索
-            article_list = ArticlePost.objects.filter(
-                Q(title__icontains=search) |
-                Q(body__icontains=search)
-            ).order_by('-total_views')
-        else:
-            article_list = ArticlePost.objects.filter(
-                Q(title__icontains=search) |
-                Q(body__icontains=search)
-            )
-    else:
-        # 将 search 参数重置为空
-        search = ''
-        if order == 'total_views':
-            article_list = ArticlePost.objects.all().order_by('-total_views')
-        else:
-            article_list = ArticlePost.objects.all()
-
     # 每页显示 6 篇文章
     paginator = Paginator(article_list, 6)
     # 获取 url 中的页码
@@ -77,20 +69,24 @@ def article_list(request):
     return render(request, 'article/list.html', context)
 
 
-# 引入markdown模块
-import markdown
+
 
 # 文章详情
 def article_detail(request, id):
     # 取出相应的文章
     article = ArticlePost.objects.get(id=id)
 
+    #article = get_object_or_404(ArticlePost, id=id)
+    # 取出文章评论
+    comments = Comment.objects.filter(article=id)
+
     # 浏览量 +1
     article.total_views += 1
     article.save(update_fields=['total_views'])
 
+    '''
     # 将markdown语法渲染成html样式
-    md = markdown.Markdown(
+    article.body = markdown.markdown(article.body,
     extensions=[
     # 包含 缩写、表格等常用扩展
     'markdown.extensions.extra',
@@ -99,9 +95,23 @@ def article_detail(request, id):
     # 目录扩展
     'markdown.extensions.toc',
     ])
+'''
+
+# Markdown 语法渲染
+    md = markdown.Markdown(
+        extensions=[
+        # 包含 缩写、表格等常用扩展
+        'markdown.extensions.extra',
+        # 语法高亮扩展
+        'markdown.extensions.codehilite',
+        # 目录扩展
+        'markdown.extensions.toc',
+        ]
+    )
     article.body = md.convert(article.body)
-    # 需要传递给模板的对象
-    context = { 'article': article, 'toc': md.toc }
+
+    # 需要传递给模板的对象    添加comments上下文
+    context = { 'article': article, 'toc': md.toc, 'comments': comments }
     # 载入模板，并返回context对象
     return render(request, 'article/detail.html', context)
 
