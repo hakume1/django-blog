@@ -41,6 +41,8 @@ urlpatterns = [
     path('inbox/notifications/', include(notifications.urls, namespace='notifications')),
     # notice
     path('notice/', include('notice.urls', namespace='notice')),
+    # django-allauth
+    path('accounts/', include('allauth.urls')),
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
