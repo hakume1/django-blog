@@ -44,11 +44,13 @@ INSTALLED_APPS = [
     'taggit',
     'ckeditor',
     'mptt',
+    'notifications',
 
     # 新增'article'代码，激活app
     'article',
     'userprofile',
     'comment',
+    'notice',
 ]
 
 MIDDLEWARE = [
