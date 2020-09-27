@@ -54,13 +54,17 @@ class ArticlePost(models.Model):
     # 文章正文。保存大量文本使用 TextField
     body = models.TextField()
 
+    # 浏览量
+    total_views = models.PositiveIntegerField(default=0)
+
+    # 文章点赞数
+    likes = models.PositiveIntegerField(default=0)
+
     # 文章创建时间。参数 default=timezone.now 指定其在创建数据时将默认写入当前的时间
     created = models.DateTimeField(default=timezone.now)
 
     # 文章更新时间。参数 auto_now=True 指定每次数据更新时自动写入当前时间
     updated = models.DateTimeField(auto_now=True)
-
-    total_views = models.PositiveIntegerField(default=0)
 
     # 内部类 class Meta 用于给 model 定义元数据
     class Meta:

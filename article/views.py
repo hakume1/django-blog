@@ -27,6 +27,10 @@ from comment.models import Comment
 
 from comment.forms import CommentForm
 
+
+# 通用类视图
+from django.views import View
+
 from django.views.generic import ListView,DetailView
 
 from django.views.generic.edit import CreateView
@@ -127,6 +131,24 @@ def article_detail(request, id):
     ])
 '''
 
+    # 过滤出所有的id比当前文章小的文章
+    pre_article = ArticlePost.objects.filter(id__lt=article.id).order_by('-id')
+    # 过滤出id大的文章
+    next_article = ArticlePost.objects.filter(id__gt=article.id).order_by('id')
+
+    # 取出相邻前一篇文章
+    if pre_article.count() > 0:
+        pre_article = pre_article[0]
+    else:
+        pre_article = None
+
+    # 取出相邻后一篇文章
+    if next_article.count() > 0:
+        next_article = next_article[0]
+    else:
+        next_article = None
+
+
 # Markdown 语法渲染
     md = markdown.Markdown(
         extensions=[
@@ -148,6 +170,8 @@ def article_detail(request, id):
         'article': article,
         'toc': md.toc,
         'comments': comments,
+        'pre_article': pre_article,
+        'next_article': next_article,
         'comment_form': comment_form,
     }
     # 载入模板，并返回context对象
@@ -281,6 +305,16 @@ def article_update(request, id):
         }
         # 将响应返回到模板中
         return render(request, 'article/update.html', context)
+
+
+# 点赞数 +1
+class IncreaseLikesView(View):
+    def post(self, request, *args, **kwargs):
+        article = ArticlePost.objects.get(id=kwargs.get('id'))
+        article.likes += 1
+        article.save()
+        return HttpResponse('success')
+
 
 
 class ContextMixin:
